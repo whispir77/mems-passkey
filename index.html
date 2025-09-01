@@ -1,0 +1,81 @@
+html_content = '''
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Passkey Registration Test</title>
+</head>
+<body>
+  <h2>Register Your Passkey</h2>
+  <button onclick="startRegistration()">Register</button>
+  <pre id="output"></pre>
+
+  <script>
+    async function startRegistration() {
+      const username = "brian.armstrong@sopranodesign.com";
+      const displayName = "Brian Armstrong";
+      const rpId = "aunzdemo.au.whispir.com";
+
+      const formData = new URLSearchParams();
+      formData.append("username", username);
+      formData.append("displayName", displayName);
+      formData.append("rpid", rpId);
+
+      const response = await fetch("https://aus.sopranodesign.com/maapi/passkeys/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          "X-MEMS-API-ID": "96338",
+          "X-MEMS-API-KEY": "97b16b4640844dfea9b4d06b8b16cb40"
+        },
+        body: formData
+      });
+
+      const result = await response.json();
+      document.getElementById("output").textContent = JSON.stringify(result, null, 2);
+
+      const options = result.request.publicKeyCredentialCreationOptions;
+      options.challenge = Uint8Array.from(atob(options.challenge), c => c.charCodeAt(0));
+      options.user.id = Uint8Array.from(atob(options.user.id), c => c.charCodeAt(0));
+
+      const credential = await navigator.credentials.create({ publicKey: options });
+
+      function bufferToBase64url(buffer) {
+        return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+          .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+      }
+
+      const responseJson = {
+        credential: {
+          id: credential.id,
+          rawId: bufferToBase64url(credential.rawId),
+          type: credential.type,
+          response: {
+            clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
+            attestationObject: bufferToBase64url(credential.response.attestationObject)
+          }
+        },
+        requestId: result.request.requestId
+      };
+
+      const finishResponse = await fetch("https://aus.sopranodesign.com/maapi/passkeys/register/finish", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-MEMS-API-ID": "96338",
+          "X-MEMS-API-KEY": "97b16b4640844dfea9b4d06b8b16cb40"
+        },
+        body: JSON.stringify({ responseJson: JSON.stringify(responseJson) })
+      });
+
+      const finishResult = await finishResponse.json();
+      document.getElementById("output").textContent += "\n\nFinish Response:\n" + JSON.stringify(finishResult, null, 2);
+    }
+  </script>
+</body>
+</html>
+'''
+
+with open("index.html", "w") as f:
+    f.write(html_content)
+
+print("index.html file has been created with the test passkey registration flow.")
